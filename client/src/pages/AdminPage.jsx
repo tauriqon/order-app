@@ -1,79 +1,117 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Package, TrendingUp, CheckCircle, Clock, Plus, Minus } from 'lucide-react';
-
-const API_BASE = 'http://localhost:5001/api';
+import { supabase } from '../supabase';
 
 export default function AdminPage() {
   const [dashboard, setDashboard] = useState({ totalCount: 0, receivedCount: 0, inProgressCount: 0, completedCount: 0 });
   const [stocks, setStocks] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const [dashRes, stockRes, orderRes] = await Promise.all([
-        fetch(`${API_BASE}/orders/dashboard`),
-        fetch(`${API_BASE}/stocks`),
-        fetch(`${API_BASE}/orders`)
-      ]);
-      const dashData = await dashRes.json();
-      const stockData = await stockRes.json();
-      const orderData = await orderRes.json();
-      
-      setDashboard(dashData);
-      setStocks(stockData);
-      setOrders(orderData);
+      // 대시보드와 주문 목록을 위한 order 및 중첩 쿼리
+      const { data: ordersData, error: ordersErr } = await supabase
+        .from('orders')
+        .select(`
+          id, ordered_at, total_price, status,
+          order_items ( menu_name, options, quantity )
+        `)
+        .order('ordered_at', { ascending: false });
+
+      if (ordersData) {
+        let rec = 0, inp = 0, com = 0;
+        const formattedOrders = ordersData.map(o => {
+          if (o.status === '주문 접수') rec++;
+          if (o.status === '제조 중') inp++;
+          if (o.status === '제조 완료') com++;
+          
+          let itemsSummary = o.order_items.map(i => {
+             let opts = [];
+             if(i.options.extraShot) opts.push('샷추가');
+             if(i.options.syrup) opts.push('시럽');
+             let suffix = opts.length ? `(${opts.join(', ')})` : '';
+             return `${i.menu_name}${suffix} ${i.quantity}개`;
+          }).join(', ');
+
+          return {
+             orderId: String(o.id),
+             orderedAt: o.ordered_at,
+             itemsSummary,
+             totalPrice: o.total_price,
+             status: o.status
+          };
+        });
+        setDashboard({ totalCount: ordersData.length, receivedCount: rec, inProgressCount: inp, completedCount: com });
+        setOrders(formattedOrders);
+      }
+
+      // 재고 조회
+      const { data: stocksData } = await supabase.from('stocks').select('stock, menu_id');
+      const { data: menusData } = await supabase.from('menus').select('id, name');
+
+      if (stocksData && menusData) {
+        const formattedStocks = stocksData.map(s => {
+           const match = menusData.find(m => m.id === s.menu_id);
+           return { menuId: s.menu_id, menuName: match ? match.name : s.menu_id, stock: s.stock };
+        }).sort((a,b) => a.menuId.localeCompare(b.menuId));
+        setStocks(formattedStocks);
+      }
+
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const handleStockChange = async (menuId, action) => {
+    if (isUpdating) return;
+    setIsUpdating(true);
     try {
-      const res = await fetch(`${API_BASE}/stocks/${menuId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action })
-      });
-      if (res.ok) {
-        // Optimistic update
-        setStocks(prev => prev.map(s => {
-          if (s.menuId === menuId) {
-            const newStock = action === 'increase' ? s.stock + 1 : Math.max(0, s.stock - 1);
-            return { ...s, stock: newStock };
-          }
-          return s;
-        }));
+      const current = stocks.find(s => s.menuId === menuId);
+      if (!current) return;
+      const newStock = action === 'increase' ? current.stock + 1 : Math.max(0, current.stock - 1);
+
+      const { error } = await supabase.from('stocks').update({ stock: newStock }).eq('menu_id', menuId);
+      
+      if (!error) {
+        setStocks(prev => prev.map(s => s.menuId === menuId ? { ...s, stock: newStock } : s));
       }
     } catch (err) {
       alert('재고 업데이트에 실패했습니다.');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
   const handleStatusChange = async (orderId, newStatus) => {
+    if (isUpdating) return;
+    setIsUpdating(true);
     try {
-      const res = await fetch(`${API_BASE}/orders/${orderId}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
-      });
-      if (res.ok) {
-        // Refresh all data
+      const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', parseInt(orderId));
+      if (!error) {
         fetchData();
       }
     } catch (err) {
       alert('상태 업데이트에 실패했습니다.');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
   if (loading) {
-    return <div style={{textAlign: 'center', marginTop: '50px'}}>관리자 데이터를 불러오는 중입니다...</div>;
+    return (
+      <div className="loader-container">
+        <div className="spinner"></div>
+        <div>관리자 데이터를 불러오는 중입니다...</div>
+      </div>
+    );
   }
 
   return (
@@ -120,7 +158,7 @@ export default function AdminPage() {
                   <button 
                     className="btn-icon" 
                     onClick={() => handleStockChange(stock.menuId, 'decrease')}
-                    disabled={stock.stock <= 0}
+                    disabled={stock.stock <= 0 || isUpdating}
                   >
                     <Minus size={16} />
                   </button>
@@ -128,6 +166,7 @@ export default function AdminPage() {
                   <button 
                     className="btn-icon" 
                     onClick={() => handleStockChange(stock.menuId, 'increase')}
+                    disabled={isUpdating}
                   >
                     <Plus size={16} />
                   </button>
@@ -161,7 +200,7 @@ export default function AdminPage() {
                     <select 
                       value={order.status} 
                       onChange={(e) => handleStatusChange(order.orderId, e.target.value)}
-                      disabled={order.status === '제조 완료'}
+                      disabled={order.status === '제조 완료' || isUpdating}
                     >
                       <option value="주문 접수" disabled={order.status !== '주문 접수'}>주문 접수</option>
                       <option value="제조 중">제조 중</option>

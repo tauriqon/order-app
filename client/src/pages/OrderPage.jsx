@@ -1,30 +1,46 @@
 import { useState, useEffect } from 'react';
 import { ShoppingCart, Plus, Minus, Coffee } from 'lucide-react';
-
-const API_BASE = 'http://localhost:5001/api';
+import { supabase } from '../supabase';
 
 export default function OrderPage() {
   const [menus, setMenus] = useState([]);
   const [cart, setCart] = useState([]);
   const [optionState, setOptionState] = useState({}); // { menuId: { extraShot: false, syrup: false } }
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_BASE}/menus`)
-      .then(res => res.json())
-      .then(data => {
-        setMenus(data);
+    async function fetchMenus() {
+      try {
+        const { data, error } = await supabase
+          .from('menus')
+          .select('*')
+          .order('id', { ascending: true });
+          
+        if (error) throw error;
+        
+        const fetchedMenus = data.map(m => ({
+          id: m.id,
+          name: m.name,
+          price: m.price,
+          description: m.description,
+          imageUrl: m.image_url
+        }));
+        
+        setMenus(fetchedMenus);
+        
         const initialOptions = {};
-        data.forEach(m => {
+        fetchedMenus.forEach(m => {
           initialOptions[m.id] = { extraShot: false, syrup: false };
         });
         setOptionState(initialOptions);
+      } catch (err) {
+        console.error('Failed to load menus', err);
+      } finally {
         setLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setLoading(false);
-      });
+      }
+    }
+    fetchMenus();
   }, []);
 
   const handleOptionChange = (menuId, field) => {
@@ -75,38 +91,71 @@ export default function OrderPage() {
   };
 
   const handleOrder = async () => {
-    if (cart.length === 0) return;
+    if (cart.length === 0 || isSubmitting) return;
+    setIsSubmitting(true);
     
-    const totalPrice = cart.reduce((sum, item) => sum + item.subtotal, 0);
-    const payload = {
-      items: cart,
-      totalPrice
-    };
-
-    try {
-      const res = await fetch(`${API_BASE}/orders`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!res.ok) {
-        const errData = await res.json();
-        alert(`주문 실패: ${errData.error || '알 수 없는 오류'}`);
+    // 재고 검증
+    for (const item of cart) {
+      const { data: stockData } = await supabase
+        .from('stocks')
+        .select('stock')
+        .eq('menu_id', item.menuId)
+        .single();
+        
+      if (!stockData || stockData.stock < item.quantity) {
+        alert(`죄송합니다. ${item.menuName}의 재고가 부족합니다.`);
         return;
       }
+    }
+
+    const totalPrice = cart.reduce((sum, item) => sum + item.subtotal, 0);
+
+    try {
+      // 재고 차감 (클라이언트에서 직접)
+      for (const item of cart) {
+         const { data: currentStock } = await supabase.from('stocks').select('stock').eq('menu_id', item.menuId).single();
+         await supabase.from('stocks').update({ stock: currentStock.stock - item.quantity }).eq('menu_id', item.menuId);
+      }
+
+      // 주문 생성
+      const { data: orderData, error: orderErr } = await supabase
+        .from('orders')
+        .insert({ total_price: totalPrice, status: '주문 접수' })
+        .select()
+        .single();
+
+      if (orderErr) throw orderErr;
+
+      // 아이템 생성
+      const orderItemsInsert = cart.map(item => ({
+        order_id: orderData.id,
+        menu_id: item.menuId,
+        menu_name: item.menuName,
+        options: item.options,
+        quantity: item.quantity,
+        unit_price: item.unitPrice,
+        subtotal: item.subtotal
+      }));
+
+      const { error: itemsErr } = await supabase.from('order_items').insert(orderItemsInsert);
+      if (itemsErr) throw itemsErr;
 
       alert('주문이 성공적으로 접수되었습니다!');
       setCart([]);
     } catch (err) {
-      alert('네트워크 오류가 발생했습니다.');
+      alert('오류가 발생했습니다: ' + err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   if (loading) {
-    return <div style={{textAlign: 'center', marginTop: '50px'}}>메뉴를 불러오는 중입니다...</div>;
+    return (
+      <div className="loader-container">
+        <div className="spinner"></div>
+        <div>메뉴를 불러오는 중입니다...</div>
+      </div>
+    );
   }
 
   const cartTotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
@@ -204,10 +253,10 @@ export default function OrderPage() {
             <button 
               className="btn" 
               style={{ padding: '16px', fontSize: '1.1rem' }} 
-              disabled={cart.length === 0}
+              disabled={cart.length === 0 || isSubmitting}
               onClick={handleOrder}
             >
-              주문 접수하기
+              {isSubmitting ? '주문 접수 중...' : '주문 접수하기'}
             </button>
           </div>
         </div>

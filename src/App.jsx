@@ -1,10 +1,10 @@
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
+import { HashRouter, Routes, Route, NavLink } from 'react-router-dom';
 import OrderPage from './pages/OrderPage';
 import AdminPage from './pages/AdminPage';
 
 function App() {
   return (
-    <BrowserRouter basename={import.meta.env.BASE_URL}>
+    <HashRouter>
       <div className="container">
         <header className="header glass">
           <div className="brand">COZY COFFEE</div>
@@ -29,7 +29,7 @@ function App() {
           <Route path="/admin" element={<AdminPage />} />
         </Routes>
       </div>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 

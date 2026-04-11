@@ -217,7 +217,7 @@ export default function OrderPage() {
             {menus.map(menu => (
               <div key={menu.id} className="card glass">
                 {menu.imageUrl ? (
-                  <img src={menu.imageUrl} alt={menu.name} className="card-image" />
+                  <img src={`${import.meta.env.BASE_URL}${menu.imageUrl.startsWith('/') ? menu.imageUrl.slice(1) : menu.imageUrl}`} alt={menu.name} className="card-image" />
                 ) : (
                   <div className="card-image" style={{display:'flex', alignItems:'center', justifyContent:'center'}}>
                     <Coffee size={48} opacity={0.5} />

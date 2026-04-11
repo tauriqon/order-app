@@ -163,7 +163,7 @@ export default function OrderPage() {
   return (
     <div className="page-layout">
       {/* Menu List */}
-      <div>
+      <div style={{ marginBottom: '40px' }}>
         <h2 style={{ marginBottom: '20px' }}>메뉴 선택</h2>
         {menus.length === 0 ? (
           <p>표시할 메뉴가 없습니다.</p>
@@ -210,55 +210,53 @@ export default function OrderPage() {
         )}
       </div>
 
-      {/* Cart Area */}
-      <div>
-        <div className="sidebar glass">
-          <h2 style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ShoppingCart /> 장바구니
-          </h2>
-          
-          <div style={{ flexGrow: 1, overflowY: 'auto', marginBottom: '20px' }}>
-            {cart.length === 0 ? (
-              <div style={{color:'var(--text-secondary)', textAlign:'center', marginTop:'40px'}}>
-                장바구니가 비어있습니다.
-              </div>
-            ) : (
-              cart.map((item, i) => (
-                <div key={i} className="cart-item">
-                  <div style={{ flexGrow: 1 }}>
-                    <div style={{ fontWeight: '600' }}>{item.menuName}</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                      {[item.options.extraShot && '샷추가', item.options.syrup && '시럽'].filter(Boolean).join(', ')}
-                    </div>
-                    <div style={{ fontSize: '0.9rem', marginTop: '4px', color: 'var(--primary)' }}>
-                      {item.unitPrice.toLocaleString()}원 x {item.quantity}
-                    </div>
+      {/* Cart Area (At bottom) */}
+      <div className="sidebar glass">
+        <h2 style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <ShoppingCart /> 장바구니
+        </h2>
+        
+        <div style={{ overflowY: 'auto', maxHeight: '400px', marginBottom: '20px' }}>
+          {cart.length === 0 ? (
+            <div style={{color:'var(--text-secondary)', textAlign:'center', padding:'40px 0'}}>
+              장바구니가 비어있습니다. 메뉴를 선택해 주세요.
+            </div>
+          ) : (
+            cart.map((item, i) => (
+              <div key={i} className="cart-item">
+                <div style={{ flexGrow: 1 }}>
+                  <div style={{ fontWeight: '600' }}>{item.menuName}</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    {[item.options.extraShot && '샷추가', item.options.syrup && '시럽'].filter(Boolean).join(', ')}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ fontWeight: '700' }}>{item.subtotal.toLocaleString()}원</div>
-                    <button className="btn-icon" onClick={() => removeFromCart(i)}>
-                      <Minus size={14} />
-                    </button>
+                  <div style={{ fontSize: '0.9rem', marginTop: '4px', color: 'var(--primary)' }}>
+                    {item.unitPrice.toLocaleString()}원 x {item.quantity}
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ fontWeight: '700' }}>{item.subtotal.toLocaleString()}원</div>
+                  <button className="btn-icon" onClick={() => removeFromCart(i)}>
+                    <Minus size={14} />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
 
-          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', fontSize: '1.2rem', fontWeight: 'bold' }}>
-              <span>총 결제금액</span>
-              <span style={{ color: 'var(--primary)' }}>{cartTotal.toLocaleString()}원</span>
-            </div>
-            <button 
-              className="btn" 
-              style={{ padding: '16px', fontSize: '1.1rem' }} 
-              disabled={cart.length === 0 || isSubmitting}
-              onClick={handleOrder}
-            >
-              {isSubmitting ? '주문 접수 중...' : '주문 접수하기'}
-            </button>
+        <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', fontSize: '1.2rem', fontWeight: 'bold' }}>
+            <span>총 결제금액</span>
+            <span style={{ color: 'var(--primary)' }}>{cartTotal.toLocaleString()}원</span>
           </div>
+          <button 
+            className="btn" 
+            style={{ padding: '16px', fontSize: '1.1rem' }} 
+            disabled={cart.length === 0 || isSubmitting}
+            onClick={handleOrder}
+          >
+            {isSubmitting ? '주문 접수 중...' : '주문 접수하기'}
+          </button>
         </div>
       </div>
     </div>

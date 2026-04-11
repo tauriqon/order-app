@@ -106,15 +106,15 @@ body {
 
 /* Page Layout */
 .page-layout {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 30px;
   padding-bottom: 50px;
 }
 
 @media (max-width: 1024px) {
   .page-layout {
-    grid-template-columns: 1fr;
+    gap: 20px;
   }
 }
 
@@ -193,6 +193,14 @@ body {
   background: var(--text-secondary);
 }
 
+.btn-danger {
+  background: var(--danger);
+}
+.btn-danger:hover:not(:disabled) {
+  background: #dc2626;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+}
+
 .btn-secondary {
   background: rgba(255, 255, 255, 0.1);
 }
@@ -227,12 +235,10 @@ body {
 
 /* Cart & Sidebar */
 .sidebar {
-  position: sticky;
-  top: 100px;
-  height: calc(100vh - 120px);
   display: flex;
   flex-direction: column;
   padding: 24px;
+  width: 100%;
 }
 
 .cart-item {
@@ -265,15 +271,74 @@ body {
 /* Admin Specific */
 .admin-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 20px;
-  margin-bottom: 30px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+@media (max-width: 768px) {
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.board-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 200px;
+}
+
+.board-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.board-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.board-list-item {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+  transition: background 0.2s;
+}
+
+.board-list-item:hover {
+  background: rgba(0, 0, 0, 0.01);
+}
+
+.board-list-item:last-child {
+  border-bottom: none;
+}
+
+.board-count {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
 }
 
 .stat-card {
-  padding: 24px;
-  text-align: center;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
+
+.admin-board-container {
+  padding: 30px;
+  margin-bottom: 40px;
+}
+
 .stat-value {
   font-size: 2.5rem;
   font-weight: 800;
@@ -314,6 +379,7 @@ body {
 .status-주문접수 { background: rgba(245, 158, 11, 0.15); color: #d97706; }
 .status-제조중 { background: rgba(59, 130, 246, 0.15); color: #2563eb; }
 .status-제조완료 { background: rgba(16, 185, 129, 0.15); color: #059669; }
+.status-취소됨 { background: rgba(0, 0, 0, 0.05); color: var(--text-secondary); }
 
 select {
   background: white;

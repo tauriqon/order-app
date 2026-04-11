@@ -61,22 +61,24 @@ interface OrderPayload { items: CartItem[]; totalPrice: number; orderedAt: strin
 
 ### 5.2 화면 구성
 1. **헤더**: 글로벌 공통 헤더
-2. **대시보드**: 주문 집계 (총 주문, 접수, 제조 중, 완료) 4개 카드
-3. **재고 현황**: 개별 메뉴 재고 표시 및 `+`, `-` 버튼
-4. **주문 현황**: 주문 목록(최신순), 각 주문별 상태 셀렉터 버튼
+2. **현황판 섹션 (Admin Board)**: 2x2 현황판 및 구분 배경 카드 적용
+3. **재고 관리 섹션 (Inventory)**: 개별 메뉴 재고 표시 및 증감 버튼
+4. **상태별 액션**: 항목별 리스트 형태의 주문 정보 및 취소/삭제 버튼 제공
 
 ### 5.3 기능 요구사항 (FR)
-- **FR-01**: 4가지 핵심 통계 지표 표시 및 갱신.
+- **FR-01**: 4개 영역별 주문 목록 자동 필터링 및 실시간 개수 표시.
 - **FR-02 & FR-03**: 재고 현황 표시, +/ - 버튼으로 증감(음수 불가), DB 실시간 업데이트.
-- **FR-04 & FR-05**: 전체 주문 리스트 표시, 각 주문 단계별 한 방향 전이 가능 (접수 -> 제조 중 -> 완료).  
-  - 제조 완료 시 추가 변경 불가 조치
+- **FR-04**: 주문 전이 관리. (접수 -> 제조 중 -> 완료) 전이 가능.
+- **FR-05**: **주문 취소 및 삭제**. 
+  - '접수', '제조 중' 주문은 '취소' 가능 (상태가 '취소됨'으로 변경).
+  - '완료', '취소됨' 주문은 목록에서 '영구 삭제' 가능.
 - **FR-06**: 데이터 없음, 통신 지연 등에 대한 피드백 UI 구성.
 
 ### 5.4 데이터 모델
 ```typescript
 interface StockItem { menuId: string; menuName: string; stock: number; }
-interface AdminOrder { orderId: string; orderedAt: string(ISO); itemsSummary: string; totalPrice: number; status: "주문 접수" | "제조 중" | "제조 완료"; }
-interface OrderDashboard { totalCount: number; receivedCount: number; inProgressCount: number; completedCount: number; }
+interface AdminOrder { orderId: string; orderedAt: string(ISO); itemsSummary: string; totalPrice: number; status: "주문 접수" | "제조 중" | "제조 완료" | "취소됨"; }
+interface OrderDashboard { receivedCount: number; inProgressCount: number; completedCount: number; cancelledCount: number; }
 ```
 
 ### 5.5 비기능 요구사항 / UI 요건 (공통)

@@ -4,7 +4,7 @@ import AdminPage from './pages/AdminPage';
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <div className="container">
         <header className="header glass">
           <div className="brand">COZY COFFEE</div>

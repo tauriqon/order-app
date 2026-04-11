@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ShoppingCart, Plus, Minus, Coffee } from 'lucide-react';
 import { supabase } from '../supabase';
 
@@ -9,39 +9,61 @@ export default function OrderPage() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    async function fetchMenus() {
-      try {
-        const { data, error } = await supabase
-          .from('menus')
-          .select('*')
-          .order('id', { ascending: true });
-          
-        if (error) throw error;
+  const fetchMenus = useCallback(async () => {
+    try {
+      const { data: menusData, error: menusErr } = await supabase
+        .from('menus')
+        .select('*')
+        .order('id', { ascending: true });
         
-        const fetchedMenus = data.map(m => ({
+      if (menusErr) throw menusErr;
+
+      const { data: stocksData, error: stocksErr } = await supabase
+        .from('stocks')
+        .select('*');
+        
+      if (stocksErr) throw stocksErr;
+      
+      const fetchedMenus = menusData.map(m => {
+        const s = stocksData.find(st => st.menu_id === m.id);
+        return {
           id: m.id,
           name: m.name,
           price: m.price,
           description: m.description,
-          imageUrl: m.image_url
-        }));
-        
-        setMenus(fetchedMenus);
-        
-        const initialOptions = {};
-        fetchedMenus.forEach(m => {
-          initialOptions[m.id] = { extraShot: false, syrup: false };
-        });
-        setOptionState(initialOptions);
-      } catch (err) {
-        console.error('Failed to load menus', err);
-      } finally {
-        setLoading(false);
-      }
+          imageUrl: m.image_url,
+          stock: s ? s.stock : 0
+        };
+      });
+      
+      setMenus(fetchedMenus);
+      
+      const initialOptions = {};
+      fetchedMenus.forEach(m => {
+        initialOptions[m.id] = { extraShot: false, syrup: false };
+      });
+      setOptionState(initialOptions);
+    } catch (err) {
+      console.error('Failed to load menus', err);
+    } finally {
+      setLoading(false);
     }
-    fetchMenus();
   }, []);
+
+  useEffect(() => {
+    fetchMenus();
+
+    const channel = supabase
+      .channel('order-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stocks' }, () => {
+        fetchMenus();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchMenus]);
 
   const handleOptionChange = (menuId, field) => {
     setOptionState(prev => ({
@@ -61,6 +83,26 @@ export default function OrderPage() {
 
   const addToCart = (menu) => {
     const options = optionState[menu.id];
+    
+    // 장바구니에 담기 전 재고 확인
+    const existingInCart = cart.find(
+      p => p.menuId === menu.id && 
+           p.options.extraShot === options.extraShot && 
+           p.options.syrup === options.syrup
+    );
+
+    if (existingInCart) {
+      if (existingInCart.quantity >= menu.stock) {
+        alert(`죄송합니다. ${menu.name}의 현재 재고(${menu.stock}개)를 초과하여 담을 수 없습니다.`);
+        return;
+      }
+    } else {
+      if (menu.stock <= 0) {
+        alert('죄송합니다. 품절된 상품입니다.');
+        return;
+      }
+    }
+
     const unitPrice = getSubtotal(menu.price, options);
     
     setCart(prev => {
@@ -103,7 +145,9 @@ export default function OrderPage() {
         .single();
         
       if (!stockData || stockData.stock < item.quantity) {
-        alert(`죄송합니다. ${item.menuName}의 재고가 부족합니다.`);
+        alert(`죄송합니다. ${item.menuName}의 재고가 현재 부족합니다. (현재 재고: ${stockData?.stock || 0}개)`);
+        setIsSubmitting(false); // 버튼 상태 복구
+        fetchMenus(); // 최신 재고 정보를 가져와 UI 업데이트
         return;
       }
     }
@@ -142,6 +186,7 @@ export default function OrderPage() {
 
       alert('주문이 성공적으로 접수되었습니다!');
       setCart([]);
+      fetchMenus(); // 즉시 UI 갱신을 위해 호출
     } catch (err) {
       alert('오류가 발생했습니다: ' + err.message);
     } finally {
@@ -178,7 +223,12 @@ export default function OrderPage() {
                     <Coffee size={48} opacity={0.5} />
                   </div>
                 )}
-                <div className="card-title">{menu.name}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div className="card-title" style={{ margin: 0 }}>{menu.name}</div>
+                  {menu.stock === 0 && (
+                    <span className="stock-badge stock-품절" style={{ padding: '2px 8px', borderRadius: '4px' }}>품절</span>
+                  )}
+                </div>
                 <div className="card-price">{menu.price.toLocaleString()}원</div>
                 <div className="card-desc">{menu.description}</div>
                 
@@ -201,8 +251,13 @@ export default function OrderPage() {
                   </label>
                 </div>
                 
-                <button className="btn" onClick={() => addToCart(menu)}>
-                  <Plus size={18} /> 담기
+                <button 
+                  className="btn" 
+                  onClick={() => addToCart(menu)}
+                  disabled={menu.stock === 0 || cart.filter(item => item.menuId === menu.id).reduce((sum, item) => sum + item.quantity, 0) >= menu.stock}
+                  style={{ fontSize: '1.2rem' }}
+                >
+                  <Plus size={20} /> {menu.stock === 0 ? '품절되었습니다' : '담기'}
                 </button>
               </div>
             ))}

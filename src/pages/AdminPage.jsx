@@ -489,8 +489,21 @@ function OrderItem({ order, onStatusChange, onCancel, onDelete, isUpdating, isSe
           )}
           
           {onCancel && (
-            <button className="btn-icon" onClick={onCancel} style={{ width: '32px', height: '32px', background: '#fee2e2', color: '#dc2626', borderColor: '#fecaca' }}>
-              <XCircle size={16} />
+            <button 
+              className="btn" 
+              onClick={onCancel} 
+              style={{ 
+                width: 'auto', 
+                padding: '6px 12px', 
+                fontSize: '0.85rem', 
+                background: '#fee2e2', 
+                color: '#dc2626', 
+                border: '1px solid #fecaca',
+                height: 'auto',
+                minWidth: 'fit-content'
+              }}
+            >
+              취소
             </button>
           )}
           
